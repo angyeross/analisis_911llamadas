@@ -1,0 +1,317 @@
+---
+title: "Análisis  de Llamadas al 911 en la CDMX"
+author: "Angye Adriana Rosado Salinas y Giovani Eduardo Blanco Flores"
+date: ' 15 de Junio 2025'
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, results='hide', setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(readr)
+
+# Cargar archivos CSV
+df_2021_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s1.csv", locale = locale(encoding = "LATIN1"))
+df_2021_s2 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s2.csv", locale = locale(encoding = "LATIN1"))
+df_2022_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2022_s1.csv", locale = locale(encoding = "LATIN1"))
+
+# Unir todos los datos
+df_llamadas <- bind_rows(df_2021_s1, df_2021_s2, df_2022_s1)
+```
+
+# Introducción
+
+En esta actividad, se realiza un análisis exploratorio del conjunto de datos correspondientes a las llamadas realizadas al número de emergencia 911 en la Ciudad de México durante el primer y segundo semestre de 2021, y el primer semestre de 2022. El objetivo principal es identificar patrones de comportamiento, tendencias temporales y categorías más frecuentes de incidentes reportados por la ciudadanía, utilizando herramientas del lenguaje de programación R, como las librerías dplyr, lubridate y tidyr.
+
+El conjunto de datos analizado contiene información detallada sobre cada llamada, como la fecha y hora de creación y cierre del incidente, la alcaldía donde ocurrió, la categoría del evento y su clasificación. A través del procesamiento y análisis de esta información, se busca responder preguntas clave como: ¿En qué días y horarios ocurren más emergencias? ¿Qué tipos de incidentes son más frecuentes? ¿Qué proporción de llamadas son falsas alarmas? Los resultados se presentan mediante gráficos y resúmenes estadísticos que permiten interpretar los datos de forma clara y accesible.
+
+# Objetivos de Analisis
+
+1.  Identificación de patrones temporales:
+
+Determinar qué día de la semana se registran más incidentes.
+
+Analizar la distribución horaria de los incidentes.
+
+2.  Análisis por categoría de incidente:
+
+Comparar la frecuencia de llamadas en diferentes categorías como delito, emergencia y urgencia médica.
+
+Estimar promedios de incidentes por tipo y por alcaldía.
+
+3.  Detección de falsos positivos:
+
+Calcular el porcentaje de llamadas clasificadas como falsas alarmas para evaluar eficiencia y veracidad de reportes.
+
+# Origen y estructura de los datos
+
+Los datos utilizados en este proyecto provienen del portal de datos abiertos de la CDMX (<https://datos.cdmx.gob.mx/dataset/llamadas-numero-de-atencion-a-emergencias-911>).
+
+El conjunto contiene información de incidentes registrados, incluyendo campos como:
+
+-   `fecha_creacion`: fecha y hora en que se recibió el reporte.
+-   `fecha_cierre`: fecha y hora en que se resolvió el incidente.
+-   `alcaldia_cierre`: demarcación donde se atendió el incidente.
+-   `categoria_incidente_c4`: tipo de incidente reportado.
+-   `clas_con_f_alarma`: si el incidente fue una falsa alarma o no.
+
+# Incidente por mes, alcaldia y promedio de incidentes por categoria.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=6}
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+
+df_llamadas <- df_llamadas %>%
+  mutate(
+    fecha_creacion = ymd_hms(fecha_creacion, quiet = TRUE),
+    mes = floor_date(fecha_creacion, "month")
+  )
+
+resumen_incidentes <- df_llamadas %>%
+  group_by(mes, alcaldia_cierre, categoria_incidente_c4) %>%
+  summarise(total_incidentes = n(), .groups = "drop")
+
+promedio_por_categoria <- resumen_incidentes %>%
+  group_by(alcaldia_cierre, categoria_incidente_c4) %>%
+  summarise(promedio_incidentes = mean(total_incidentes), .groups = "drop")
+
+ggplot(promedio_por_categoria, aes(x = alcaldia_cierre, y = promedio_incidentes, fill = categoria_incidente_c4)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Promedio mensual de incidentes por alcaldía y categoría",
+       x = "Alcaldía",
+       y = "Promedio de incidentes",
+       fill = "Categoría") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 8),  # Más pequeño
+    axis.text.y = element_text(size = 9),
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+```
+
+**Hallazgo:**
+
+El análisis contempla la variación mensual de incidentes, su distribución geográfica por alcaldía, y el promedio de reportes por categoría, lo que permite una lectura integral del comportamiento de la demanda por ubicación, tiempo y tipo de incidente.
+
+Análisis por componente: Incidentes por mes Aunque no se dan cifras explícitas en el documento, la inclusión de este gráfico sugiere la intención de:
+
+Detectar estacionalidades o picos anómalos.
+
+Relacionar ciertos aumentos de incidentes con eventos sociales, climáticos o festividades (por ejemplo, más robos en diciembre o más incendios en temporada seca).
+
+Este tipo de análisis es clave para la planeación anticipada de recursos. Si un mes históricamente tiene mayor número de incidentes, se pueden reforzar las unidades operativas antes de que ocurra.
+
+Incidentes por alcaldía Este componente territorial identifica zonas con alta frecuencia de incidentes, lo cual es crítico para:
+
+Detectar focos rojos en materia de seguridad pública, salud o gestión de emergencias.
+
+Evaluar la efectividad de las estrategias ya implementadas (patrullaje, cámaras, servicios médicos).
+
+Un alto número de reportes en determinadas alcaldías puede correlacionarse con:
+
+Densidad poblacional elevada.
+
+Condiciones socioeconómicas más vulnerables.
+
+Deficiencias estructurales en servicios públicos.
+
+También puede servir para priorizar inversiones públicas o ubicar nuevas instalaciones (centros de atención, ambulancias, estaciones de policía).
+
+Promedio de incidentes por categoría Este análisis permite observar cuáles tipos de incidentes son recurrentemente más frecuentes en términos proporcionales, independientemente del total mensual.
+
+Es útil para comparar la evolución interna del sistema de atención, por ejemplo:
+
+Si los promedios de “delito” superan sistemáticamente a los de “emergencia médica”, se evidencia la necesidad de redirigir esfuerzos policiales.
+
+Si una categoría muestra incrementos sostenidos en su promedio, puede representar una tendencia emergente (como más incidentes relacionados con salud mental o violencia intrafamiliar).
+
+Esta métrica ayuda a evaluar la eficiencia y cobertura de los servicios según su especialización.
+
+# Día de la semana con mayor numero de incidentes y total de llamadas
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Cargar librerías necesarias
+library(dplyr)
+library(ggplot2)
+library(lubridate) 
+
+# Cargar archivos CSV
+df_2021_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s1.csv", locale = locale(encoding = "LATIN1"))
+df_2021_s2 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s2.csv", locale = locale(encoding = "LATIN1"))
+df_2022_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2022_s1.csv", locale = locale(encoding = "LATIN1"))
+
+# Unir todos los datos
+df_llamadas <- bind_rows(df_2021_s1, df_2021_s2, df_2022_s1)
+
+
+# Para trabajar con fechas
+# Extraer el día de la semana de cada llamada
+df_llamadas <- df_llamadas %>%
+  mutate(dia_semana = wday(fecha_creacion, label = TRUE, abbr = FALSE,
+                           locale = "es_ES.UTF-8"))
+# Contar el total de llamadas por día de la semana
+llamadas_por_dia <- df_llamadas %>%
+  group_by(dia_semana) %>%
+  summarise(total_llamadas = n()) %>%
+  arrange(match(dia_semana, c("lunes", "martes", "miércoles", "jueves",
+                              "viernes", "sábado", "domingo")))
+# Encontrar el día con más llamadas
+dia_max_llamadas <- llamadas_por_dia %>%
+  filter(total_llamadas == max(total_llamadas))
+# Mostrar el día con más incidentes
+cat("El día con más incidentes fue:", dia_max_llamadas$dia_semana, "con
+un total de", dia_max_llamadas$total_llamadas, "llamadas.\n")
+# Crear gráfico de línea
+ggplot(llamadas_por_dia, aes(x = dia_semana, y = total_llamadas, group =
+                               1)) +
+  geom_line(color = "steelblue", size = 1.2) +
+  geom_point(size = 3, color = "darkred") +
+  labs(
+    title = "Total de llamadas por día de la semana",
+    x = "Día de la semana",
+    y = "Total de llamadas"
+  ) +
+  theme_minimal()
+```
+
+**Hallazgo:**
+
+El día 7 (domingo) concentra la mayor cantidad de llamadas de incidentes, con un total de 325,184 reportes. Este resultado refleja un patrón conductual y social significativo. Los domingos suelen ser días de descanso y convivencia social, pero también de alta actividad recreativa y consumo de alcohol, lo que puede derivar en más conflictos, accidentes, riñas o reportes por ruido y desorden. La carga de trabajo para los servicios de emergencia en este día específico exige una mayor dotación de personal y unidades disponibles, especialmente en turnos vespertinos y nocturnos. Es recomendable implementar estrategias preventivas en fines de semana, como patrullajes disuasivos o campañas de concientización.
+
+# Distribucion de incidencias por hora del dia para categorias como "delito, emergencia y urgencia medica"
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Cargar librerías 
+# Cargar librerías
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(readr)
+library(stringr)
+# Preparar datos: extraer hora y estandarizar categoría
+df_llamadas <- df_llamadas %>%
+  mutate(
+    
+    categoria = str_to_upper(trimws(clas_con_f_alarma)),
+    # LIMPIAR TEXTO
+    hora = as.integer(substr(hora_creacion, 1, 2))
+    # EXTRAER HORA
+  ) %>%
+  filter(categoria %in% c("DELITO", "EMERGENCIA", "URGENCIAS
+MEDICAS")) # FILTRAR CATEGORÍAS
+# Verifica que URGENCIA MÉDICA está presente
+table(df_llamadas$categoria)
+# Crear gráfico de densidad por hora
+ggplot(df_llamadas, aes(x = hora, fill = categoria)) +
+  geom_histogram(binwidth = 1, color = "black", alpha = 0.7, position
+                 = "identity") +
+  facet_wrap(~ categoria, ncol = 1) +
+  labs(
+    title = "Distribución de incidentes por hora del día",
+    x = "Hora del día",
+    y = "Número de incidentes"
+  ) +
+  scale_x_continuous(breaks = 0:23) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal()
+
+
+
+```
+
+**Hallazgo:**
+
+Delitos: 377,511 llamadas. Emergencias médicas: 142,646 llamadas. Las llamadas por delitos representan la categoría más frecuente, más del doble que las emergencias médicas. Esto apunta a que los problemas de seguridad ciudadana son el principal motivo de atención de los servicios. Este tipo de análisis es esencial para enfocar las políticas públicas de seguridad y permite a las autoridades identificar la necesidad de refuerzo policial y vigilancia estratégica en ciertas zonas o franjas horarias. Las emergencias médicas, aunque menores en número, también representan una porción significativa que requiere atención especializada (ambulancias, paramédicos, traslados). Se recomienda segmentar aún más estos datos (por tipo de delito o emergencia) para focalizar la respuesta institucional.
+
+# Porcentaje de llamadas que clasificadas como Falsas
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+
+# Cargar archivos CSV
+df_2021_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s1.csv", locale = locale(encoding = "LATIN1"))
+df_2021_s2 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2021_s2.csv", locale = locale(encoding = "LATIN1"))
+df_2022_s1 <- read_csv("C:/Users/Angye Ross/Documents/analisis_911llamadas/llamadas_911_2022_s1.csv", locale = locale(encoding = "LATIN1"))
+
+# Unir todos los datos
+df_llamadas <- bind_rows(df_2021_s1, df_2021_s2, df_2022_s1)
+
+# Total de llamadas (todas las filas del dataframe)
+total_llamadas <- nrow(df_llamadas)
+
+# Total de llamadas clasificadas como "FALSA ALARMA"
+falsas_alarmas <- df_llamadas %>%
+  filter(clas_con_f_alarma == "FALSA ALARMA") %>%
+  summarise(total_falsas = n())
+
+# Calcular el porcentaje general
+porcentaje_falsas <- (falsas_alarmas$total_falsas / total_llamadas) * 100
+
+# Mostrar el resultado general
+cat("El porcentaje general de llamadas clasificadas como 'Falsa Alarma' es:", 
+    round(porcentaje_falsas, 2), "%\n")
+
+# Porcentaje de falsas alarmas por alcaldía
+porcentaje_por_alcaldia <- df_llamadas %>%
+  group_by(alcaldia_cierre) %>%
+  summarise(
+    total_llamadas = n(),
+    falsas_alarmas = sum(clas_con_f_alarma == "FALSA ALARMA", na.rm = TRUE)
+  ) %>%
+  mutate(porcentaje_falsas = (falsas_alarmas / total_llamadas) * 100)
+
+# Gráfico de barras
+ggplot(porcentaje_por_alcaldia, aes(x = reorder(alcaldia_cierre, -porcentaje_falsas), y = porcentaje_falsas)) +
+  geom_bar(stat = "identity", fill = "tomato") +
+  labs(
+    title = "Porcentaje de llamadas clasificadas como 'Falsa Alarma' por alcaldía",
+    x = "Alcaldía",
+    y = "Porcentaje de falsas alarmas (%)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+
+**Hallazgo:**
+
+El porcentaje de llamadas clasificadas como “falsa alarma” es del 0.03%. Esta proporción extremadamente baja indica un alto nivel de confiabilidad en los reportes ciudadanos. En sistemas de atención de emergencias, las llamadas falsas suelen entorpecer operaciones y desperdiciar recursos. Por tanto, este resultado refleja una buena educación cívica, filtrado adecuado en los centros de atención o incluso protocolos efectivos de validación. No obstante, aún se pueden estudiar los casos específicos de falsas alarmas para identificar patrones: si se concentran en ciertas zonas, franjas horarias o dispositivos (por ejemplo, llamadas automáticas o erróneas desde sistemas de alarma domésticos).
+
+# Reflexion
+
+El análisis de los datos presentados en el documento revela patrones relevantes tanto en la temporalidad, ubicación geográfica como en la naturaleza de los incidentes, lo que constituye una base sólida para la toma de decisiones en los ámbitos de seguridad pública, salud, protección civil y planificación urbana.
+
+En primer lugar, el hecho de que el día domingo (día 7) registre el mayor número de incidentes, con más de 325,000 llamadas, refleja una tendencia social que debe ser considerada en la programación operativa de los cuerpos de emergencia. La concentración de reportes en fines de semana, particularmente en jornadas de esparcimiento y alta movilidad, exige una redistribución táctica de personal y recursos que contemple estos picos de actividad. Este hallazgo también invita a generar campañas preventivas enfocadas en la convivencia segura y el uso responsable del espacio público durante los fines de semana.
+
+Asimismo, la distribución por categorías, con un claro predominio de reportes por delitos (377,511 casos) frente a emergencias médicas (142,646), pone en evidencia que la inseguridad ciudadana sigue siendo la preocupación principal de la población al momento de solicitar ayuda. Esta realidad debe ser leída como un llamado urgente a fortalecer las políticas de prevención del delito, la presencia policial y la intervención comunitaria, sin descuidar la atención médica prehospitalaria. La diferencia notable entre ambas categorías también sugiere la necesidad de mejorar los canales de denuncia y respuesta específica para cada tipo de situación.
+
+Por otra parte, aunque el análisis horario no presenta datos detallados, su inclusión permite identificar el potencial valor estratégico de estudiar la carga operativa a lo largo del día, algo indispensable para optimizar turnos, asignar patrullas y establecer alertas en momentos críticos del día. Este tipo de análisis adquiere aún más valor cuando se cruza con datos por alcaldía y categoría, permitiendo modelar escenarios de intervención en tiempo real.
+
+En cuanto al porcentaje de llamadas clasificadas como falsas alarmas (0.03%), este resultado es especialmente positivo, ya que indica un altísimo grado de veracidad en los reportes ciudadanos, lo que se traduce en una utilización más eficiente de los recursos de respuesta. Esto sugiere también que la ciudadanía tiene un conocimiento adecuado del uso correcto de los sistemas de emergencia, o bien que los mecanismos de filtro son eficaces para detectar reportes inexactos o maliciosos.
+
+El análisis por mes, alcaldía y promedio por categoría añade una capa crucial al diagnóstico. La posibilidad de identificar meses con mayores incidencias, así como zonas geográficas críticas y categorías con mayor recurrencia, permite una visión sistémica e integrada de la problemática. Este enfoque no solo orienta las decisiones tácticas inmediatas, sino que también habilita una planificación estratégica de mediano y largo plazo, como la instalación de bases móviles, estaciones de respuesta rápida o refuerzo de presencia institucional en ciertas alcaldías con alta demanda.
+
+En resumen, el análisis explorado no solo ofrece una lectura detallada del comportamiento ciudadano frente a situaciones de riesgo o necesidad, sino que se convierte en una herramienta fundamental para la formulación de políticas públicas informadas, la mejora en la gestión de recursos y la construcción de ciudades más seguras, eficientes y resilientes. Se recomienda dar continuidad a este tipo de análisis mediante la incorporación de capas adicionales de datos (clima, festividades, eventos deportivos, etc.) y mediante el uso de herramientas predictivas que ayuden a anticipar crisis y mejorar la capacidad de respuesta del sistema.
+
+# Proyectos futuros
+
+Este tipo de análisis puede ampliarse para incluir:
+
+-   Predicciones de demanda por zona y horario
+
+-   Análisis de tiempos de respuesta por tipo de incidente
+
+-   Uso de mapas geográficos para ubicar incidentes
+
+-   Modelos de aprendizaje automático para detectar patrones anómalos
+
+\
